@@ -1,0 +1,26 @@
+{
+   "name": "elogank/lol-replay-observer",
+   "description": "A simple library to allow players to watch League of Legends replays on your server",
+   "keywords": ["lol", "library", "league of legends", "replay", "record", "spectator", "server", "observer", "download"],
+   "licence": "MIT",
+   "authors": [
+       {
+           "name": "Sylvain Lorinet",
+           "email": "sylvain.lorinet@gmail.com"
+       }
+    ],
+    "require": {
+        "php": ">=5.4.0",
+        "elogank/lol-replay-downloader": "1.1.*@dev"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    },
+    "autoload": {
+        "psr-0": {
+            "EloGank\\Replay": "src/"
+        }
+    }
+}

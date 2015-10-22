@@ -112,7 +112,7 @@ class ReplayObserver
     /**
      * Route: /getGameMetaData/{region}/{gameId}/{token}/token
      */
-    public function gameMetasDataAction($region, $gameId, $token, $clientIp)
+    public function getGameMetasData($region, $gameId, $token, $clientIp)
     {
         // Setting cache for chunk init
         $cacheName = $this->getCacheName($gameId, $clientIp);

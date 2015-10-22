@@ -15,6 +15,7 @@ use EloGank\Replay\Downloader\Client\Exception\TimeoutException;
 use EloGank\Replay\Downloader\Client\ReplayClient;
 use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
 use EloGank\Replay\Observer\Cache\Adapter\NullCacheAdapter;
+use EloGank\Replay\Observer\Client\ReplayObserverClient;
 use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
 
 /**
@@ -22,13 +23,18 @@ use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
  */
 class ReplayObserver
 {
-    const CACHE_KEY = 'elogank.replay.';
+    const CACHE_KEY = 'elogank.replay.observer.';
 
 
     /**
      * @var ReplayClient
      */
     protected $client;
+
+    /**
+     * @var ReplayObserverClient
+     */
+    protected $replayObserverClient;
 
     /**
      * @var CacheAdapterInterface
@@ -42,13 +48,14 @@ class ReplayObserver
 
 
     /**
-     * @param ReplayClient          $client
-     * @param CacheAdapterInterface $cache
-     * @param bool                  $isAuthStrict
+     * @param null                       $client
+     * @param                            $replayObserverClient
+     * @param CacheAdapterInterface|null $cache
+     * @param bool|false                 $isAuthStrict
      *
-     * @throws \RuntimeException
+     * // TODO handle the case of changing the $replayObserverClient class
      */
-    public function __construct($client = null, CacheAdapterInterface $cache = null, $isAuthStrict = false)
+    public function __construct($client = null, $replayObserverClient, CacheAdapterInterface $cache = null, $isAuthStrict = false)
     {
         if (false === $isAuthStrict && null == $cache) {
             throw new \RuntimeException('The replay observer cannot be "authorization strict" with an empty cache.');
@@ -86,8 +93,7 @@ class ReplayObserver
         if ($this->cache->has($cacheName)) {
             // Cache the version to avoid a next call
             $version = $this->cache->get($cacheName);
-        }
-        else {
+        } else {
             $version = $this->client->getObserverVersion();
             if (false === $version) {
                 throw new TimeoutException('The server has timed out.');
@@ -104,11 +110,34 @@ class ReplayObserver
     }
 
     /**
+     * Route: /getGameMetaData/{region}/{gameId}/{token}/token
+     */
+    public function gameMetasDataAction($region, $gameId, $token, $clientIp)
+    {
+        // Setting cache for chunk init
+        $cacheName = $this->getCacheName($gameId, $clientIp);
+        $this->cache->set($cacheName, 0, 86400); // 1 day
+
+        return $this->replayObserverClient->getMetas($region, $gameId);
+    }
+
+    /**
+     * @param int    $gameId
+     * @param string $clientIp
+     *
+     * @return string
+     */
+    protected function getCacheName($gameId, $clientIp)
+    {
+        return $cacheName = self::CACHE_KEY . $gameId . '.ip.' . $clientIp . '.chunk_infos.try';
+    }
+
+    /**
      * This method will check if the user does not leech your replay files.
      * The only condition is to check if the user header send the "Accept" header. Indeed, the game does not send
      * this data.
      *
-     * @param null||string $acceptHeader
+     * @param null|string $acceptHeader
      *
      * @return bool
      */
@@ -117,4 +146,3 @@ class ReplayObserver
         return !$this->isAuthStrict || null === $acceptHeader;
     }
 }
- 

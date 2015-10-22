@@ -9,21 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace EloGank\Replay\Observer\Exception;
+namespace EloGank\Replay\Observer\Client\Exception;
 
 use EloGank\Replay\Exception\ReplayException;
 
 /**
  * @author Sylvain Lorinet <sylvain.lorinet@gmail.com>
  */
-class UnauthorizedAccessException extends ReplayException
-{
-    /**
-     * @param string $message
-     * @param int    $statusCode
-     */
-    public function __construct($message = 'Unauthorized user access', $statusCode = 0)
-    {
-        parent::__construct($message, $statusCode);
-    }
-}
+class ReplayFolderNotFoundException extends ReplayException { }

@@ -62,7 +62,7 @@ class ReplayObserverClient
         $stringGameId = (string) $gameId;
 
         return sprintf(
-            '%s/%s/%s/%s/%s/%d',
+            '%s/%s/%s/%s/%s/%s',
             $this->replaysDirPath,
             $region,
             $stringGameId[0] . $stringGameId[1],

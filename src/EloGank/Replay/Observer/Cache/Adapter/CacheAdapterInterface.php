@@ -39,4 +39,3 @@ interface CacheAdapterInterface
      */
     public function set($key, $value, $ttl = null);
 }
- 

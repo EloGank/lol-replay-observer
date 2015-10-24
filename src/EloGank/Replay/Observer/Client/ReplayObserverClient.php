@@ -23,6 +23,7 @@ class ReplayObserverClient
      */
     protected $replaysDirPath;
 
+
     /**
      * @param string $replaysDirPath
      */
@@ -49,6 +50,31 @@ class ReplayObserverClient
         }
 
         return json_decode(file_get_contents($this->getReplayDirPath($region, $gameId) . '/metas.json'), true);
+    }
+
+    /**
+     * @param array $metas
+     * @param int   $chunkId
+     * @param bool  $throwException
+     *
+     * @return int
+     *
+     * @throws \RuntimeException
+     */
+    public function findKeyframeByChunkId(array $metas, $chunkId, $throwException = false)
+    {
+        // Method based on metas.json > pendingAvailableKeyFrameInfo
+        foreach ($metas['pendingAvailableKeyFrameInfo'] as $keyframe) {
+            if ($chunkId == $keyframe['nextChunkId']) {
+                return $keyframe['id'];
+            }
+        }
+
+        if ($throwException) {
+            throw new \RuntimeException('No keyframe found for chunk #' . ($chunkId + 1));
+        }
+
+        return $this->findKeyframeByChunkId($metas, $chunkId - 1, true);
     }
 
     /**

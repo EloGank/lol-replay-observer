@@ -17,6 +17,7 @@ use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
 use EloGank\Replay\Observer\Cache\Adapter\NullCacheAdapter;
 use EloGank\Replay\Observer\Client\ReplayObserverClient;
 use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
+use EloGank\Replay\Output\OutputInterface;
 
 /**
  * @author Sylvain Lorinet <sylvain.lorinet@gmail.com>
@@ -46,6 +47,11 @@ class ReplayObserver
      */
     protected $isAuthStrict;
 
+    /**
+     * @var OutputInterface
+     */
+    protected $output;
+
 
     /**
      * @param null                       $client
@@ -55,7 +61,12 @@ class ReplayObserver
      *
      * // TODO handle the case of changing the $replayObserverClient class
      */
-    public function __construct($client = null, $replayObserverClient, CacheAdapterInterface $cache = null, $isAuthStrict = false)
+    public function __construct(
+        $client = null,
+        $replayObserverClient,
+        CacheAdapterInterface $cache = null,
+        $isAuthStrict = false
+    )
     {
         if (false === $isAuthStrict && null == $cache) {
             throw new \RuntimeException('The replay observer cannot be "authorization strict" with an empty cache.');
@@ -122,6 +133,94 @@ class ReplayObserver
     }
 
     /**
+     * Route: /getLastChunkInfo/{region}/{gameId}/{chunkId}/token
+     */
+    public function getLastChunkInfo($region, $gameId, $chunkId, $clientIp)
+    {
+        // Cache control
+        $cacheName = $this->getCacheName($gameId, $clientIp);
+
+        // TODO validate isAuthStrict with a same IP
+        if ($this->isAuthStrict && !$this->cache->has($cacheName)) {
+            // Log
+            $this->log($gameId, sprintf('GET /getLastChunkInfo/%s/%s/%d/token | ERROR: trying to access without cached current chunkId', $region, $gameId, $chunkId));
+
+            return false;
+        }
+
+        // TODO at this time, two players with the same IP watching the same game will have some weird issue
+        $currentChunkId = $this->cache->get($cacheName) + 1;
+        $metas = $this->replayObserverClient->getMetas($region, $gameId);
+
+        // Game loading information
+        //$firstChunkId = $replayManager->findFirstChunkId($metas);
+        $firstChunkId = $metas['firstChunkId'];
+
+        // A bug appears when endStartupChunkId = 3 and startGameChunkId = 5, the game won't load
+        if ($metas['endStartupChunkId'] + 2 == $firstChunkId) {
+            $firstChunkId = $metas['startGameChunkId'] + 2;
+        }
+
+        $keyframeId = $this->replayObserverClient->findKeyframeByChunkId($metas, $firstChunkId);
+
+        $lastChunkInfo = array(
+            'chunkId'            => $firstChunkId,
+            'availableSince'     => 30000,
+            'nextAvailableChunk' => 30000,
+            'keyFrameId'         => $keyframeId,
+            'nextChunkId'        => $firstChunkId,
+            'endStartupChunkId'  => $metas['endStartupChunkId'],
+            'startGameChunkId'   => $metas['startGameChunkId'],
+            'endGameChunkId'     => 0,
+            'duration'           => 30000
+        );
+
+        // In game information
+        if ($firstChunkId != $metas['startGameChunkId'] && $currentChunkId - 1 == $metas['startGameChunkId']) {
+            $currentChunkId = $firstChunkId;
+        }
+
+        if ($currentChunkId > $metas['startGameChunkId']) {
+            $keyframeId = $this->replayObserverClient->findKeyframeByChunkId($metas, $currentChunkId);
+            if ($currentChunkId > $metas['lastChunkId']) {
+                $currentChunkId = $metas['lastChunkId'];
+            }
+
+            $lastChunkInfo['chunkId']            = $currentChunkId;
+            $lastChunkInfo['nextChunkId']        = $metas['lastChunkId'];
+            $lastChunkInfo['keyFrameId']         = $keyframeId;
+            $lastChunkInfo['nextAvailableChunk'] = $currentChunkId == $firstChunkId + 6 ? 30000 : 100; // wait for full loading
+        }
+
+        // End game, stop downloading
+        if ($currentChunkId == $metas['lastChunkId']) {
+            $lastChunkInfo['nextAvailableChunk'] = 90000;
+            $lastChunkInfo['endGameChunkId']     = $metas['endGameChunkId'];
+        }
+
+        // Saving current chunkId in cache
+        $this->cache->set($cacheName, $currentChunkId);
+
+        // Log
+        $this->log($gameId, sprintf('GET /getLastChunkInfo/%s/%s/%d/token | currentChunkId: %s | currentKeyframe: %s', $region, $gameId, $chunkId, $currentChunkId, $keyframeId));
+
+        return $lastChunkInfo;
+    }
+
+    /**
+     * @param string $gameId
+     * @param string $message
+     *
+     * @return bool
+     */
+    protected function log($gameId, $message)
+    {
+        if (null != $this->output && OutputInterface::VERBOSITY_VERBOSE >= $this->output->getVerbosity()) {
+            $this->output->writeln('Game #' . $gameId . ': ' . $message);
+        }
+    }
+
+    /**
      * @param int    $gameId
      * @param string $clientIp
      *
@@ -144,5 +243,13 @@ class ReplayObserver
     public function isAuthorized($acceptHeader)
     {
         return !$this->isAuthStrict || null === $acceptHeader;
+    }
+
+    /**
+     * @param OutputInterface $output
+     */
+    public function setOutput(OutputInterface $output)
+    {
+        $this->output = $output;
     }
 }

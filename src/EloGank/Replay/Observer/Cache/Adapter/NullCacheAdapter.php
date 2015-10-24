@@ -50,4 +50,3 @@ class NullCacheAdapter implements CacheAdapterInterface
         return true;
     }
 }
- 

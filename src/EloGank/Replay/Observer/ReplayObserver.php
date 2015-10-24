@@ -15,6 +15,7 @@ use EloGank\Replay\Downloader\Client\Exception\TimeoutException;
 use EloGank\Replay\Downloader\Client\ReplayClient;
 use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
 use EloGank\Replay\Observer\Cache\Adapter\NullCacheAdapter;
+use EloGank\Replay\Observer\Client\Exception\ReplayChunkNotFoundException;
 use EloGank\Replay\Observer\Client\ReplayObserverClient;
 use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
 use EloGank\Replay\Output\OutputInterface;
@@ -182,6 +183,7 @@ class ReplayObserver
 
         if ($currentChunkId > $metas['startGameChunkId']) {
             $keyframeId = $this->replayObserverClient->findKeyframeByChunkId($metas, $currentChunkId);
+
             if ($currentChunkId > $metas['lastChunkId']) {
                 $currentChunkId = $metas['lastChunkId'];
             }
@@ -205,6 +207,43 @@ class ReplayObserver
         $this->log($gameId, sprintf('GET /getLastChunkInfo/%s/%s/%d/token | currentChunkId: %s | currentKeyframe: %s', $region, $gameId, $chunkId, $currentChunkId, $keyframeId));
 
         return $lastChunkInfo;
+    }
+
+    /**
+     * Route: /getGameDataChunk/{region}/{gameId}/{chunkId}/token
+     */
+    public function getGameDataChunkPath($region, $gameId, $chunkId)
+    {
+        $chunkPath = null;
+
+        try {
+            $chunkPath = $this->replayObserverClient->getChunkPath($region, $gameId, $chunkId);
+        } catch (ReplayChunkNotFoundException $e) {
+            // Log
+            $this->log($gameId, sprintf('GET /getGameDataChunk/%s/%s/%d/token | ERROR: the chunk data is not found', $region, $gameId, $chunkId));
+
+            throw $e;
+        }
+
+        // Log
+        $this->log($gameId, sprintf('GET /getGameDataChunk/%s/%s/%d/token', $region, $gameId, $chunkId));
+
+        // TODO return createDownloadResponse
+        return $chunkPath;
+    }
+
+    /**
+     * @param string $region
+     * @param string $gameId
+     * @param int    $chunkId
+     *
+     * @return string
+     *
+     * @throws ReplayChunkNotFoundException
+     */
+    public function getGameDataChunkContent($region, $gameId, $chunkId)
+    {
+        return file_get_contents($this->getGameDataChunkPath($region, $gameId, $chunkId));
     }
 
     /**

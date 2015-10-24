@@ -11,7 +11,9 @@
 
 namespace EloGank\Replay\Observer\Client;
 
+use EloGank\Replay\Observer\Client\Exception\ReplayChunkNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayFolderNotFoundException;
+use EloGank\Replay\Observer\Client\Exception\ReplayKeyframeNotFoundException;
 
 /**
  * @author Sylvain Lorinet <sylvain.lorinet@gmail.com>
@@ -59,7 +61,7 @@ class ReplayObserverClient
      *
      * @return int
      *
-     * @throws \RuntimeException
+     * @throws ReplayKeyframeNotFoundException
      */
     public function findKeyframeByChunkId(array $metas, $chunkId, $throwException = false)
     {
@@ -71,10 +73,30 @@ class ReplayObserverClient
         }
 
         if ($throwException) {
-            throw new \RuntimeException('No keyframe found for chunk #' . ($chunkId + 1));
+            throw new ReplayKeyframeNotFoundException('No keyframe found for chunk #' . ($chunkId + 1));
         }
 
         return $this->findKeyframeByChunkId($metas, $chunkId - 1, true);
+    }
+
+    /**
+     * @param string $region
+     * @param string $gameId
+     * @param int    $chunkId
+     *
+     * @return string
+     *
+     * @throws ReplayChunkNotFoundException
+     */
+    public function getChunkPath($region, $gameId, $chunkId)
+    {
+        $filePath = $this->getReplayDirPath($region, $gameId) . '/chunks/' . $chunkId;
+
+        if (!is_file($filePath)) {
+            throw new ReplayChunkNotFoundException('The chunk #' . $chunkId . ' is not found');
+        }
+
+        return $filePath;
     }
 
     /**

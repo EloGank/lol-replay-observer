@@ -101,6 +101,26 @@ class ReplayObserverClient
 
     /**
      * @param string $region
+     * @param string $gameId
+     * @param int    $keyframeId
+     *
+     * @return string
+     *
+     * @throws ReplayKeyframeNotFoundException
+     */
+    public function getKeyframePath($region, $gameId, $keyframeId)
+    {
+        $filePath = $this->getReplayDirPath($region, $gameId) . '/keyframes/' . $keyframeId;
+
+        if (!is_file($filePath)) {
+            throw new ReplayKeyframeNotFoundException('The keyframe #' . $keyframeId . ' is not found');
+        }
+
+        return $filePath;
+    }
+
+    /**
+     * @param string $region
      * @param int    $gameId
      *
      * @return string

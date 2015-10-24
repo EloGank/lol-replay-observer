@@ -16,6 +16,7 @@ use EloGank\Replay\Downloader\Client\ReplayClient;
 use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
 use EloGank\Replay\Observer\Cache\Adapter\NullCacheAdapter;
 use EloGank\Replay\Observer\Client\Exception\ReplayChunkNotFoundException;
+use EloGank\Replay\Observer\Client\Exception\ReplayKeyframeNotFoundException;
 use EloGank\Replay\Observer\Client\ReplayObserverClient;
 use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
 use EloGank\Replay\Output\OutputInterface;
@@ -244,6 +245,43 @@ class ReplayObserver
     public function getGameDataChunkContent($region, $gameId, $chunkId)
     {
         return file_get_contents($this->getGameDataChunkPath($region, $gameId, $chunkId));
+    }
+
+    /**
+     * Route: /getKeyFrame/{region}/{gameId}/{keyframeId}/token
+     */
+    public function getKeyframePath($region, $gameId, $keyframeId)
+    {
+        $keyframePath = null;
+
+        try {
+            $keyframePath = $this->replayObserverClient->getKeyframePath($region, $gameId, $keyframeId);
+        } catch (ReplayKeyframeNotFoundException $e) {
+            // Log
+            $this->log($gameId, sprintf('GET /getKeyFrame/%s/%s/%d/token | ERROR: the keyframe is not found', $region, $gameId, $keyframeId));
+
+            throw $e;
+        }
+
+        // Log
+        $this->log($gameId, sprintf('GET /getKeyFrame/%s/%s/%d/token', $region, $gameId, $keyframeId));
+
+        // TODO return createDownloadResponse
+        return $keyframePath;
+    }
+
+    /**
+     * @param string $region
+     * @param string $gameId
+     * @param int    $keyframeId
+     *
+     * @return string
+     *
+     * @throws ReplayKeyframeNotFoundException
+     */
+    public function getKeyframeContent($region, $gameId, $keyframeId)
+    {
+        return file_get_contents($this->getKeyframePath($region, $gameId, $keyframeId));
     }
 
     /**

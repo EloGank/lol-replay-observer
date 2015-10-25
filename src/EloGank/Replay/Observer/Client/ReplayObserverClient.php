@@ -12,6 +12,7 @@
 namespace EloGank\Replay\Observer\Client;
 
 use EloGank\Replay\Observer\Client\Exception\ReplayChunkNotFoundException;
+use EloGank\Replay\Observer\Client\Exception\ReplayEndStatsNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayFolderNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayKeyframeNotFoundException;
 
@@ -114,6 +115,25 @@ class ReplayObserverClient
 
         if (!is_file($filePath)) {
             throw new ReplayKeyframeNotFoundException('The keyframe #' . $keyframeId . ' is not found');
+        }
+
+        return $filePath;
+    }
+
+    /**
+     * @param string $region
+     * @param string $gameId
+     *
+     * @return string
+     *
+     * @throws ReplayEndStatsNotFoundException
+     */
+    public function getEndStats($region, $gameId)
+    {
+        $filePath = $this->getReplayDirPath($region, $gameId) . '/endstats';
+
+        if (!is_file($filePath)) {
+            throw new ReplayEndStatsNotFoundException('The endstats for game #' . $gameId . ' is not found');
         }
 
         return $filePath;

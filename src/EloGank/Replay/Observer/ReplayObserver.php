@@ -16,6 +16,7 @@ use EloGank\Replay\Downloader\Client\ReplayClient;
 use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
 use EloGank\Replay\Observer\Cache\Adapter\NullCacheAdapter;
 use EloGank\Replay\Observer\Client\Exception\ReplayChunkNotFoundException;
+use EloGank\Replay\Observer\Client\Exception\ReplayEndStatsNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayKeyframeNotFoundException;
 use EloGank\Replay\Observer\Client\ReplayObserverClient;
 use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
@@ -150,6 +151,8 @@ class ReplayObserver
             return false;
         }
 
+        // FIXME from this, need to be refactored in replayObserverClient
+
         // TODO at this time, two players with the same IP watching the same game will have some weird issue
         $currentChunkId = $this->cache->get($cacheName) + 1;
         $metas = $this->replayObserverClient->getMetas($region, $gameId);
@@ -282,6 +285,42 @@ class ReplayObserver
     public function getKeyframeContent($region, $gameId, $keyframeId)
     {
         return file_get_contents($this->getKeyframePath($region, $gameId, $keyframeId));
+    }
+
+    /**
+     * Route: /endOfGameStats/{region}/{gameId}/null
+     */
+    public function getEndOfGameStatsPath($region, $gameId)
+    {
+        $endStatsPath = null;
+
+        try {
+            $endStatsPath = $this->replayObserverClient->getEndStats($region, $gameId);
+        } catch (ReplayEndStatsNotFoundException $e) {
+            // Log
+            $this->log($gameId, sprintf('GET /endOfGameStats/%s/%s/null | ERROR: the endstats is not found', $region, $gameId));
+
+            throw $e;
+        }
+
+        // Log
+        $this->log($gameId, sprintf('GET /endOfGameStats/%s/%s/null', $region, $gameId));
+
+        // TODO return createDownloadResponse($endStatsPath, 'null', true)
+        return $endStatsPath;
+    }
+
+    /**
+     * @param string $region
+     * @param string $gameId
+     *
+     * @return string
+     *
+     * @throws ReplayEndStatsNotFoundException
+     */
+    public function getEndOfGameStatsContent($region, $gameId)
+    {
+        return file_get_contents($this->getEndOfGameStatsPath($region, $gameId));
     }
 
     /**

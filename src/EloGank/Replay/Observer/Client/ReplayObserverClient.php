@@ -123,6 +123,71 @@ class ReplayObserverClient
     /**
      * @param string $region
      * @param string $gameId
+     * @param int    $currentChunkId
+     * @param int    $keyframeId     Passed in reference to be dumped for debug purpose
+     *
+     * @return array
+     *
+     * @throws ReplayFolderNotFoundException
+     * @throws ReplayKeyframeNotFoundException
+     */
+    public function getLastChunkInfo($region, $gameId, $currentChunkId, &$keyframeId = null)
+    {
+        $metas = $this->getMetas($region, $gameId);
+
+        // Game loading information
+        //$firstChunkId = $replayManager->findFirstChunkId($metas);
+        $firstChunkId = $metas['firstChunkId'];
+
+        // A bug appears when endStartupChunkId = 3 and startGameChunkId = 5, the game won't load
+        if ($metas['endStartupChunkId'] + 2 == $firstChunkId) {
+            $firstChunkId = $metas['startGameChunkId'] + 2;
+        }
+
+        $keyframeId = $this->findKeyframeByChunkId($metas, $firstChunkId);
+
+        $lastChunkInfo = array(
+            'chunkId'            => $firstChunkId,
+            'availableSince'     => 30000,
+            'nextAvailableChunk' => 30000,
+            'keyFrameId'         => $keyframeId,
+            'nextChunkId'        => $firstChunkId,
+            'endStartupChunkId'  => $metas['endStartupChunkId'],
+            'startGameChunkId'   => $metas['startGameChunkId'],
+            'endGameChunkId'     => 0,
+            'duration'           => 30000
+        );
+
+        // In game information
+        if ($firstChunkId != $metas['startGameChunkId'] && $currentChunkId - 1 == $metas['startGameChunkId']) {
+            $currentChunkId = $firstChunkId;
+        }
+
+        if ($currentChunkId > $metas['startGameChunkId']) {
+            $keyframeId = $this->findKeyframeByChunkId($metas, $currentChunkId);
+
+            if ($currentChunkId > $metas['lastChunkId']) {
+                $currentChunkId = $metas['lastChunkId'];
+            }
+
+            $lastChunkInfo['chunkId']            = $currentChunkId;
+            $lastChunkInfo['nextChunkId']        = $metas['lastChunkId'];
+            $lastChunkInfo['keyFrameId']         = $keyframeId;
+            $lastChunkInfo['nextAvailableChunk'] = $currentChunkId == $firstChunkId + 6 ? 30000 : 100; // wait for full loading
+        }
+
+        // End game, stop downloading
+        if ($currentChunkId == $metas['lastChunkId']) {
+            $lastChunkInfo['nextAvailableChunk'] = 90000;
+            $lastChunkInfo['endGameChunkId']     = $metas['endGameChunkId'];
+        }
+
+        return $lastChunkInfo;
+    }
+
+    /**
+     * @param string $region
+     * @param string $gameId
      *
      * @return string
      *

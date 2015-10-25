@@ -33,12 +33,12 @@ class ReplayObserver
     /**
      * @var ReplayClient
      */
-    protected $client;
+    protected $apiClient;
 
     /**
      * @var ReplayObserverClient
      */
-    protected $replayObserverClient;
+    protected $observerClient;
 
     /**
      * @var CacheAdapterInterface
@@ -57,16 +57,14 @@ class ReplayObserver
 
 
     /**
-     * @param null                       $client
-     * @param                            $replayObserverClient
+     * @param ReplayObserverClient       $observerClient
+     * @param ReplayClient|null          $apiClient
      * @param CacheAdapterInterface|null $cache
-     * @param bool|false                 $isAuthStrict
-     *
-     * // TODO handle the case of changing the $replayObserverClient class
+     * @param bool                       $isAuthStrict
      */
     public function __construct(
-        $client = null,
-        $replayObserverClient,
+        ReplayObserverClient $observerClient,
+        ReplayClient $apiClient = null,
         CacheAdapterInterface $cache = null,
         $isAuthStrict = false
     )
@@ -75,18 +73,19 @@ class ReplayObserver
             throw new \RuntimeException('The replay observer cannot be "authorization strict" with an empty cache.');
         }
 
-        if (null == $client) {
-            $client = new ReplayClient();
+        if (null == $apiClient) {
+            $apiClient = new ReplayClient();
         }
 
         if (null == $cache) {
             $cache = new NullCacheAdapter();
         }
 
-        $this->client       = $client;
-        $this->cache        = $cache;
-        $this->isAuthStrict = $isAuthStrict;
-        $this->headers      = null;
+        $this->observerClient = $observerClient;
+        $this->apiClient      = $apiClient;
+        $this->cache          = $cache;
+        $this->isAuthStrict   = $isAuthStrict;
+        $this->headers        = null;
     }
 
     /**
@@ -108,7 +107,8 @@ class ReplayObserver
             // Cache the version to avoid a next call
             $version = $this->cache->get($cacheName);
         } else {
-            $version = $this->client->getObserverVersion();
+            $version = $this->apiClient->getObserverVersion();
+
             if (false === $version) {
                 throw new TimeoutException('The server has timed out.');
             }
@@ -132,7 +132,7 @@ class ReplayObserver
         $cacheName = $this->getCacheName($gameId, $clientIp);
         $this->cache->set($cacheName, 0, 86400); // 1 day
 
-        return $this->replayObserverClient->getMetas($region, $gameId);
+        return $this->observerClient->getMetas($region, $gameId);
     }
 
     /**
@@ -151,61 +151,15 @@ class ReplayObserver
             return false;
         }
 
-        // FIXME from this, need to be refactored in replayObserverClient
-
         // TODO at this time, two players with the same IP watching the same game will have some weird issue
+        // FIXME test if $chunkId is the same as this value
         $currentChunkId = $this->cache->get($cacheName) + 1;
-        $metas = $this->replayObserverClient->getMetas($region, $gameId);
-
-        // Game loading information
-        //$firstChunkId = $replayManager->findFirstChunkId($metas);
-        $firstChunkId = $metas['firstChunkId'];
-
-        // A bug appears when endStartupChunkId = 3 and startGameChunkId = 5, the game won't load
-        if ($metas['endStartupChunkId'] + 2 == $firstChunkId) {
-            $firstChunkId = $metas['startGameChunkId'] + 2;
-        }
-
-        $keyframeId = $this->replayObserverClient->findKeyframeByChunkId($metas, $firstChunkId);
-
-        $lastChunkInfo = array(
-            'chunkId'            => $firstChunkId,
-            'availableSince'     => 30000,
-            'nextAvailableChunk' => 30000,
-            'keyFrameId'         => $keyframeId,
-            'nextChunkId'        => $firstChunkId,
-            'endStartupChunkId'  => $metas['endStartupChunkId'],
-            'startGameChunkId'   => $metas['startGameChunkId'],
-            'endGameChunkId'     => 0,
-            'duration'           => 30000
-        );
-
-        // In game information
-        if ($firstChunkId != $metas['startGameChunkId'] && $currentChunkId - 1 == $metas['startGameChunkId']) {
-            $currentChunkId = $firstChunkId;
-        }
-
-        if ($currentChunkId > $metas['startGameChunkId']) {
-            $keyframeId = $this->replayObserverClient->findKeyframeByChunkId($metas, $currentChunkId);
-
-            if ($currentChunkId > $metas['lastChunkId']) {
-                $currentChunkId = $metas['lastChunkId'];
-            }
-
-            $lastChunkInfo['chunkId']            = $currentChunkId;
-            $lastChunkInfo['nextChunkId']        = $metas['lastChunkId'];
-            $lastChunkInfo['keyFrameId']         = $keyframeId;
-            $lastChunkInfo['nextAvailableChunk'] = $currentChunkId == $firstChunkId + 6 ? 30000 : 100; // wait for full loading
-        }
-
-        // End game, stop downloading
-        if ($currentChunkId == $metas['lastChunkId']) {
-            $lastChunkInfo['nextAvailableChunk'] = 90000;
-            $lastChunkInfo['endGameChunkId']     = $metas['endGameChunkId'];
-        }
 
         // Saving current chunkId in cache
         $this->cache->set($cacheName, $currentChunkId);
+
+        $keyframeId = null;
+        $lastChunkInfo = $this->observerClient->getLastChunkInfo($region, $gameId, $currentChunkId, $keyframeId);
 
         // Log
         $this->log($gameId, sprintf('GET /getLastChunkInfo/%s/%s/%d/token | currentChunkId: %s | currentKeyframe: %s', $region, $gameId, $chunkId, $currentChunkId, $keyframeId));
@@ -221,7 +175,7 @@ class ReplayObserver
         $chunkPath = null;
 
         try {
-            $chunkPath = $this->replayObserverClient->getChunkPath($region, $gameId, $chunkId);
+            $chunkPath = $this->observerClient->getChunkPath($region, $gameId, $chunkId);
         } catch (ReplayChunkNotFoundException $e) {
             // Log
             $this->log($gameId, sprintf('GET /getGameDataChunk/%s/%s/%d/token | ERROR: the chunk data is not found', $region, $gameId, $chunkId));
@@ -258,7 +212,7 @@ class ReplayObserver
         $keyframePath = null;
 
         try {
-            $keyframePath = $this->replayObserverClient->getKeyframePath($region, $gameId, $keyframeId);
+            $keyframePath = $this->observerClient->getKeyframePath($region, $gameId, $keyframeId);
         } catch (ReplayKeyframeNotFoundException $e) {
             // Log
             $this->log($gameId, sprintf('GET /getKeyFrame/%s/%s/%d/token | ERROR: the keyframe is not found', $region, $gameId, $keyframeId));
@@ -295,7 +249,7 @@ class ReplayObserver
         $endStatsPath = null;
 
         try {
-            $endStatsPath = $this->replayObserverClient->getEndStats($region, $gameId);
+            $endStatsPath = $this->observerClient->getEndStats($region, $gameId);
         } catch (ReplayEndStatsNotFoundException $e) {
             // Log
             $this->log($gameId, sprintf('GET /endOfGameStats/%s/%s/null | ERROR: the endstats is not found', $region, $gameId));

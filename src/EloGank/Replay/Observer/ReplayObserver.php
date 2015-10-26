@@ -99,7 +99,7 @@ class ReplayObserver implements LoggerAwareInterface
      * @throws UnauthorizedAccessException
      * @throws TimeoutException
      */
-    public function versionAction($acceptHeader = null)
+    public function getVersion($acceptHeader = null)
     {
         // Retrieve and cache the version
         $cacheName = 'replay.version';

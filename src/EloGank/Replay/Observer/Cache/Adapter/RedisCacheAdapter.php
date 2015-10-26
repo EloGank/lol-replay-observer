@@ -9,9 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace EloGank\Replay\Observer\Cache;
-
-use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
+namespace EloGank\Replay\Observer\Cache\Adapter;
 
 /**
  * @author Sylvain Lorinet <sylvain.lorinet@gmail.com>
@@ -65,11 +63,10 @@ class RedisCacheAdapter implements CacheAdapterInterface
             return $this->redis->set($key, $value);
         }
 
-        if (!is_int($ttl) || 0 >= $ttl) {
+        if (null !== null && (!is_int($ttl) || 0 >= $ttl)) {
             throw new \InvalidArgumentException('The time to live parameter must be an integer and greater than zero.');
         }
 
         return $this->redis->setex($key, $value, $ttl);
     }
 }
- 

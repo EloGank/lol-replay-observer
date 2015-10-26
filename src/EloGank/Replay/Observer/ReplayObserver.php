@@ -20,12 +20,13 @@ use EloGank\Replay\Observer\Client\Exception\ReplayEndStatsNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayKeyframeNotFoundException;
 use EloGank\Replay\Observer\Client\ReplayObserverClient;
 use EloGank\Replay\Observer\Exception\UnauthorizedAccessException;
-use EloGank\Replay\Output\OutputInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * @author Sylvain Lorinet <sylvain.lorinet@gmail.com>
  */
-class ReplayObserver
+class ReplayObserver implements LoggerAwareInterface
 {
     const CACHE_KEY = 'elogank.replay.observer.';
 
@@ -51,9 +52,9 @@ class ReplayObserver
     protected $isAuthStrict;
 
     /**
-     * @var OutputInterface
+     * @var LoggerInterface
      */
-    protected $output;
+    protected $logger;
 
 
     /**
@@ -285,8 +286,8 @@ class ReplayObserver
      */
     protected function log($gameId, $message)
     {
-        if (null != $this->output && OutputInterface::VERBOSITY_VERBOSE >= $this->output->getVerbosity()) {
-            $this->output->writeln('Game #' . $gameId . ': ' . $message);
+        if (null != $this->logger) {
+            $this->logger->info('Game #' . $gameId . ': ' . $message);
         }
     }
 
@@ -316,10 +317,10 @@ class ReplayObserver
     }
 
     /**
-     * @param OutputInterface $output
+     * @inheritdoc
      */
-    public function setOutput(OutputInterface $output)
+    public function setLogger(LoggerInterface $logger)
     {
-        $this->output = $output;
+        $this->logger = $logger;
     }
 }

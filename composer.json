@@ -16,7 +16,7 @@
 
         "elogank/lol-replay-downloader": "1.1.*@dev",
 
-        "symfony/http-foundation": "~2.7"
+        "psr/log": "~1.0"
     },
     "require-dev": {
         "symfony/var-dumper": "~2.7"

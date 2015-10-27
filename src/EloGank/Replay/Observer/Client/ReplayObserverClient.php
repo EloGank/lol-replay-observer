@@ -164,11 +164,13 @@ class ReplayObserverClient
         }
 
         if ($currentChunkId > $metas['startGameChunkId']) {
-            $keyframeId = $this->findKeyframeByChunkId($metas, $currentChunkId);
-
             if ($currentChunkId > $metas['lastChunkId']) {
                 $currentChunkId = $metas['lastChunkId'];
+            } elseif ($currentChunkId < $metas['firstChunkId']) {
+                $currentChunkId = $metas['firstChunkId'];
             }
+
+            $keyframeId = $this->findKeyframeByChunkId($metas, $currentChunkId);
 
             $lastChunkInfo['chunkId']            = $currentChunkId;
             $lastChunkInfo['nextChunkId']        = $metas['lastChunkId'];

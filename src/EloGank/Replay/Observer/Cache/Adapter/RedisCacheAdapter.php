@@ -63,10 +63,14 @@ class RedisCacheAdapter implements CacheAdapterInterface
             return $this->redis->set($key, $value);
         }
 
-        if (null !== null && (!is_int($ttl) || 0 >= $ttl)) {
+        if (null == $ttl) {
+            return $this->redis->set($key, $value);
+        }
+
+        if (!is_int($ttl) || 0 >= $ttl) {
             throw new \InvalidArgumentException('The time to live parameter must be an integer and greater than zero.');
         }
 
-        return $this->redis->setex($key, $value, $ttl);
+        return $this->redis->setex($key, $ttl, $value);
     }
 }

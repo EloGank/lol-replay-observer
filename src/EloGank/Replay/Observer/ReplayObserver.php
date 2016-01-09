@@ -14,7 +14,6 @@ namespace EloGank\Replay\Observer;
 use EloGank\Replay\Downloader\Client\Exception\TimeoutException;
 use EloGank\Replay\Downloader\Client\ReplayClient;
 use EloGank\Replay\Observer\Cache\Adapter\CacheAdapterInterface;
-use EloGank\Replay\Observer\Cache\Adapter\NullCacheAdapter;
 use EloGank\Replay\Observer\Client\Exception\ReplayChunkNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayEndStatsNotFoundException;
 use EloGank\Replay\Observer\Client\Exception\ReplayKeyframeNotFoundException;
@@ -58,15 +57,15 @@ class ReplayObserver implements LoggerAwareInterface
 
 
     /**
-     * @param ReplayObserverClient       $observerClient
-     * @param ReplayClient|null          $apiClient
-     * @param CacheAdapterInterface|null $cache
-     * @param bool                       $isAuthStrict
+     * @param ReplayObserverClient  $observerClient
+     * @param CacheAdapterInterface $cache
+     * @param ReplayClient|null     $apiClient
+     * @param bool                  $isAuthStrict
      */
     public function __construct(
         ReplayObserverClient $observerClient,
+        CacheAdapterInterface $cache,
         ReplayClient $apiClient = null,
-        CacheAdapterInterface $cache = null,
         $isAuthStrict = false
     )
     {
@@ -78,21 +77,15 @@ class ReplayObserver implements LoggerAwareInterface
             $apiClient = new ReplayClient();
         }
 
-        if (null == $cache) {
-            $cache = new NullCacheAdapter();
-        }
-
         $this->observerClient = $observerClient;
-        $this->apiClient      = $apiClient;
         $this->cache          = $cache;
+        $this->apiClient      = $apiClient;
         $this->isAuthStrict   = $isAuthStrict;
         $this->headers        = null;
     }
 
     /**
-     * Route: /version
-     *
-     * @param null $acceptHeader
+     * @param string|null $acceptHeader The header 'Accept' data
      *
      * @return string
      *
@@ -125,7 +118,14 @@ class ReplayObserver implements LoggerAwareInterface
     }
 
     /**
-     * Route: /getGameMetaData/{region}/{gameId}/{token}/token
+     * @param string $region
+     * @param int    $gameId
+     * @param int    $token
+     * @param string $clientIp
+     *
+     * @return array
+     *
+     * @throws Client\Exception\ReplayFolderNotFoundException
      */
     public function getGameMetasData($region, $gameId, $token, $clientIp)
     {
@@ -137,7 +137,12 @@ class ReplayObserver implements LoggerAwareInterface
     }
 
     /**
-     * Route: /getLastChunkInfo/{region}/{gameId}/{chunkId}/token
+     * @param string $region
+     * @param int    $gameId
+     * @param int    $chunkId
+     * @param string $clientIp
+     *
+     * @return array|bool
      */
     public function getLastChunkInfo($region, $gameId, $chunkId, $clientIp)
     {
@@ -153,7 +158,6 @@ class ReplayObserver implements LoggerAwareInterface
         }
 
         // TODO at this time, two players with the same IP watching the same game will have some weird issue
-        // FIXME test if $chunkId is the same as this value
         $currentChunkId = $this->cache->get($cacheName) + 1;
 
         // Saving current chunkId in cache
@@ -169,7 +173,13 @@ class ReplayObserver implements LoggerAwareInterface
     }
 
     /**
-     * Route: /getGameDataChunk/{region}/{gameId}/{chunkId}/token
+     * @param string $region
+     * @param int    $gameId
+     * @param int    $chunkId
+     *
+     * @return null|string
+     *
+     * @throws ReplayChunkNotFoundException
      */
     public function getGameDataChunkPath($region, $gameId, $chunkId)
     {
@@ -187,7 +197,6 @@ class ReplayObserver implements LoggerAwareInterface
         // Log
         $this->log($gameId, sprintf('GET /getGameDataChunk/%s/%s/%d/token', $region, $gameId, $chunkId));
 
-        // TODO return createDownloadResponse
         return $chunkPath;
     }
 
@@ -224,7 +233,6 @@ class ReplayObserver implements LoggerAwareInterface
         // Log
         $this->log($gameId, sprintf('GET /getKeyFrame/%s/%s/%d/token', $region, $gameId, $keyframeId));
 
-        // TODO return createDownloadResponse
         return $keyframePath;
     }
 
@@ -243,7 +251,12 @@ class ReplayObserver implements LoggerAwareInterface
     }
 
     /**
-     * Route: /endOfGameStats/{region}/{gameId}/null
+     * @param string $region
+     * @param int    $gameId
+     *
+     * @return null|string
+     *
+     * @throws ReplayEndStatsNotFoundException
      */
     public function getEndOfGameStatsPath($region, $gameId)
     {
@@ -261,7 +274,6 @@ class ReplayObserver implements LoggerAwareInterface
         // Log
         $this->log($gameId, sprintf('GET /endOfGameStats/%s/%s/null', $region, $gameId));
 
-        // TODO return createDownloadResponse($endStatsPath, 'null', true)
         return $endStatsPath;
     }
 
